@@ -21,12 +21,11 @@ def main():
     input_fasta = args.input
     output_tsv = args.output
 
-    # Ensure parent directory exists for output
+ 
     os.makedirs(os.path.dirname(os.path.abspath(output_tsv)), exist_ok=True)
 
     with open(output_tsv, "w", newline="", encoding="utf-8") as tsv_file:
         writer = csv.writer(tsv_file, delimiter="\t")
-        # Fixed header: accession
         writer.writerow(["accession", "protein_id", "description", "sequence"])  
 
         for record in SeqIO.parse(input_fasta, "fasta"):

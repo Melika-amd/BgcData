@@ -27,7 +27,7 @@ def main():
 
     headers = ["accession", "taxonomy", "compound", "bioactivities", "genome_accession", "location_start", "location_end"]
 
-    # Collect all rows first so we can sort by accession numeric part
+    
     rows = []
     for filename in os.listdir(folder_path):
         if filename.endswith(".json"):
@@ -63,7 +63,7 @@ def main():
                     location_end
                 ])
 
-    # Sort by the numeric part of accession, e.g. BGC0000241 < BGC0000611
+    
     def acc_num(row):
         acc = row[0]
         m = re.search(r"BGC(\d+)", acc)
