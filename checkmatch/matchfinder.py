@@ -6,13 +6,13 @@ import pandas as pd
 
 
 def normalize_accession_deepbgc(s: pd.Series) -> pd.Series:
-    # DeepBGC cleaned has accessions like BGC0000001; strip any trailing .# just in case
+    
     s = s.fillna("").astype(str)
     return s.str.split(".").str[0]
 
 
 def normalize_accession_fasta(s: pd.Series) -> pd.Series:
-    # FASTA accessions look like BGC0000001.5|c1|... -> take before '|' and strip version suffix
+    
     s = s.fillna("").astype(str)
     core = s.str.split("|").str[0]
     return core.str.split(".").str[0]
@@ -69,11 +69,11 @@ def main():
 
     unique_deep = sorted(deep_ids - fasta_ids, key=acc_numeric)
 
-    # Write unique DeepBGC accessions
+    
     unique_path = outdir / "unique_deepbgc_accessions.tsv"
     pd.DataFrame({"accession": unique_deep}).to_csv(unique_path, sep="\t", index=False)
 
-    # Combine MIBiG + DeepBGC unique (label source)
+    
     combined_records = (
         [(a, "MIBiG") for a in sorted(fasta_ids, key=acc_numeric)] +
         [(a, "DeepBGC-unique") for a in unique_deep]
