@@ -12,10 +12,13 @@ def normalize_accession_deepbgc(s: pd.Series) -> pd.Series:
 
 
 def normalize_accession_fasta(s: pd.Series) -> pd.Series:
-    
     s = s.fillna("").astype(str)
-    core = s.str.split("|").str[0]
-    return core.str.split(".").str[0]
+    return s.str.split(".").str[0]
+
+
+def normalize_protein_id(s: pd.Series) -> pd.Series:
+    s = s.fillna("").astype(str)
+    return s.str.split(".").str[0]
 
 
 def acc_numeric(a: str) -> int:
@@ -32,7 +35,7 @@ def main():
     )
     parser.add_argument(
         "--fasta",
-        default="MIBiG_BGC/output/mibig_fasta_proteins.tsv",
+        default="MIBiG_BGC/output/mibig_fasta_proteins_fixed.tsv",
         help="Path to MIBiG FASTA-derived TSV (with 'accession' column)",
     )
     parser.add_argument(
@@ -63,27 +66,38 @@ def main():
     if "accession" not in fasta_df.columns:
         print(f"Error: 'accession' column missing in {fasta_path}")
         sys.exit(1)
+    if "protein_id" not in deep_df.columns:
+        print(f"Error: 'protein_id' column missing in {deep_path}")
+        sys.exit(1)
+    if "protein_id" not in fasta_df.columns:
+        print(f"Error: 'protein_id' column missing in {fasta_path}")
+        sys.exit(1)
 
-    deep_ids = set(normalize_accession_deepbgc(deep_df["accession"]))
-    fasta_ids = set(normalize_accession_fasta(fasta_df["accession"]))
+    deep_df = deep_df.copy()
+    fasta_df = fasta_df.copy()
+    deep_df["acc_norm"] = normalize_accession_deepbgc(deep_df["accession"]) 
+    deep_df["pid_norm"] = normalize_protein_id(deep_df["protein_id"]) 
+    fasta_df["acc_norm"] = normalize_accession_fasta(fasta_df["accession"]) 
+    fasta_df["pid_norm"] = normalize_protein_id(fasta_df["protein_id"]) 
 
-    unique_deep = sorted(deep_ids - fasta_ids, key=acc_numeric)
+    fasta_acc_set = set(fasta_df["acc_norm"].dropna())
+    fasta_pid_set = set(fasta_df["pid_norm"].dropna())
 
-    
-    unique_path = outdir / "unique_deepbgc_accessions.tsv"
-    pd.DataFrame({"accession": unique_deep}).to_csv(unique_path, sep="\t", index=False)
+    unique_mask = (~deep_df["acc_norm"].isin(fasta_acc_set)) | (~deep_df["pid_norm"].isin(fasta_pid_set))
+    unique_map = deep_df.loc[unique_mask, ["acc_norm", "pid_norm"]].drop_duplicates()
+    unique_map = unique_map.rename(columns={"acc_norm": "accession", "pid_norm": "protein_id"})
+    unique_map["source"] = "DeepBGC-unique"
+    unique_map_path = outdir / "unique_deepbgc_mapping.tsv"
+    unique_map.to_csv(unique_map_path, sep="\t", index=False)
 
-    
-    combined_records = (
-        [(a, "MIBiG") for a in sorted(fasta_ids, key=acc_numeric)] +
-        [(a, "DeepBGC-unique") for a in unique_deep]
-    )
-    combined_df = pd.DataFrame(combined_records, columns=["accession", "source"])
-    combined_path = outdir / "combined_unique_plus_mibig.tsv"
-    combined_df.to_csv(combined_path, sep="\t", index=False)
+    mibig_map = fasta_df[["acc_norm", "pid_norm"]].drop_duplicates().rename(columns={"acc_norm": "accession", "pid_norm": "protein_id"})
+    mibig_map["source"] = "MIBiG"
+    combined_map = pd.concat([mibig_map, unique_map], ignore_index=True)
+    combined_map_path = outdir / "combined_unique_plus_mibig_mapping.tsv"
+    combined_map.to_csv(combined_map_path, sep="\t", index=False)
 
-    print(f"Unique DeepBGC accessions: {len(unique_deep)} -> {unique_path}")
-    print(f"Combined (MIBiG + DeepBGC-unique): {len(combined_df)} -> {combined_path}")
+    print(f"Unique DeepBGC mapping rows: {len(unique_map)} -> {unique_map_path}")
+    print(f"Combined mapping rows (MIBiG + DeepBGC-unique): {len(combined_map)} -> {combined_map_path}")
 
 
 if __name__ == "__main__":

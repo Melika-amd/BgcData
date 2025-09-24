@@ -13,7 +13,7 @@ def main():
     )
     parser.add_argument(
         "--output",
-        default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "output", "mibig_fasta_proteins.tsv"),
+        default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "output", "mibig_fasta_proteins_fixed.tsv"),
         help="Path to output TSV file",
     )
     args = parser.parse_args()
@@ -26,16 +26,44 @@ def main():
 
     with open(output_tsv, "w", newline="", encoding="utf-8") as tsv_file:
         writer = csv.writer(tsv_file, delimiter="\t")
-        writer.writerow(["accession", "protein_id", "description", "sequence"])  
+      
+        writer.writerow([
+            "accession",   # part[0]
+            "protein_id",  # part[4]
+            "contig",      # part[1]
+            "location",    # part[2]
+            "strand",      # part[3]
+            "description", # part[5]
+            "sequence",
+        ])
 
         for record in SeqIO.parse(input_fasta, "fasta"):
-            header = record.description
-            accession = record.id.split("_prot_")[0]
-            protein_id = record.id
-            description = header
+            header = str(record.description or "")
+            parts = header.split("|") if header else []
+
+            def part(i: int) -> str:
+                try:
+                    return parts[i]
+                except Exception:
+                    return ""
+
+            accession = part(0)
+            contig = part(1)
+            location = part(2)
+            strand = part(3)
+            protein_id = part(4)
+            description = part(5)
             sequence = str(record.seq)
 
-            writer.writerow([accession, protein_id, description, sequence])
+            writer.writerow([
+                accession,
+                protein_id,
+                contig,
+                location,
+                strand,
+                description,
+                sequence,
+            ])
 
     print(f"Done! Extracted protein sequences to {output_tsv}")
 
