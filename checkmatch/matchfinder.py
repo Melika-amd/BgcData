@@ -83,21 +83,40 @@ def main():
     fasta_acc_set = set(fasta_df["acc_norm"].dropna())
     fasta_pid_set = set(fasta_df["pid_norm"].dropna())
 
-    unique_mask = (~deep_df["acc_norm"].isin(fasta_acc_set)) | (~deep_df["pid_norm"].isin(fasta_pid_set))
-    unique_map = deep_df.loc[unique_mask, ["acc_norm", "pid_norm"]].drop_duplicates()
-    unique_map = unique_map.rename(columns={"acc_norm": "accession", "pid_norm": "protein_id"})
-    unique_map["source"] = "DeepBGC-unique"
-    unique_map_path = outdir / "unique_deepbgc_mapping.tsv"
-    unique_map.to_csv(unique_map_path, sep="\t", index=False)
+    acc_unique_mask = ~deep_df["acc_norm"].isin(fasta_acc_set)
+    pid_unique_mask = ~deep_df["pid_norm"].isin(fasta_pid_set)
+    shared_acc_mask = ~acc_unique_mask
+
+    unique_clusters = (
+        deep_df.loc[acc_unique_mask, "acc_norm"]
+        .dropna()
+        .drop_duplicates()
+        .sort_values(key=lambda s: s.map(acc_numeric))
+    )
+    unique_clusters_path = outdir / "unique_clusters.tsv"
+    unique_clusters.to_frame(name="accession").to_csv(unique_clusters_path, sep="\t", index=False)
+
+    unique_protein_map = (
+        deep_df.loc[shared_acc_mask & pid_unique_mask, ["acc_norm", "pid_norm"]]
+        .drop_duplicates()
+        .rename(columns={"acc_norm": "accession", "pid_norm": "protein_id"})
+    )
+    unique_protein_map["source"] = "DeepBGC-protein-unique"
+    unique_proteins_path = outdir / "unique_proteins.tsv"
+    unique_protein_map.to_csv(unique_proteins_path, sep="\t", index=False)
 
     mibig_map = fasta_df[["acc_norm", "pid_norm"]].drop_duplicates().rename(columns={"acc_norm": "accession", "pid_norm": "protein_id"})
     mibig_map["source"] = "MIBiG"
-    combined_map = pd.concat([mibig_map, unique_map], ignore_index=True)
+    combined_map = pd.concat([mibig_map, unique_protein_map], ignore_index=True)
+    combined_map = combined_map.assign(
+        _acc_sort=combined_map["accession"].astype(str).map(acc_numeric)
+    ).sort_values(by=['_acc_sort', 'accession']).drop(columns='_acc_sort').reset_index(drop=True)
     combined_map_path = outdir / "combined_unique_plus_mibig_mapping.tsv"
     combined_map.to_csv(combined_map_path, sep="\t", index=False)
 
-    print(f"Unique DeepBGC mapping rows: {len(unique_map)} -> {unique_map_path}")
-    print(f"Combined mapping rows (MIBiG + DeepBGC-unique): {len(combined_map)} -> {combined_map_path}")
+    print(f"Unique DeepBGC clusters: {len(unique_clusters)} -> {unique_clusters_path}")
+    print(f"Unique DeepBGC proteins (accession shared): {len(unique_protein_map)} -> {unique_proteins_path}")
+    print(f"Combined mapping rows (MIBiG + DeepBGC protein-unique): {len(combined_map)} -> {combined_map_path}")
 
 
 if __name__ == "__main__":
