@@ -1,7 +1,0 @@
-datatype	count	percentage
-GenBank	28023	59.64
-Not in NCBI	18732	39.87
-UniProt	134	0.29
-RefSeq	79	0.17
-Error	19	0.04
-TOTAL	46987	100.00
